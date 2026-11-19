@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools==84.2.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tracewise"
+version = "0.1.0"
+description = "Multi-agent RAG assistant with LLM cost and latency tracing (M1: graph runs locally)."
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph==1.2.23",
+    "fastapi==0.165.0",
+    "uvicorn==0.54.0",
+    "pydantic==2.14.3",
+    "google-cloud-aiplatform==2.10.0",
+    "google-genai==2.34.0",
+    "chromadb==1.5.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "httpx==0.28.1",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
