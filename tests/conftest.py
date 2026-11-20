@@ -27,6 +27,15 @@ def fixture_store(settings) -> ChromaStore:
     return store
 
 
+@pytest.fixture(autouse=True)
+def _reset_tracing():
+    from app.tracing import middleware
+
+    middleware.reset()
+    yield
+    middleware.reset()
+
+
 @pytest.fixture
 def make_env():
     """Return (settings, store) for the fake backend with the fixture corpus ingested."""

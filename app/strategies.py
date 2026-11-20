@@ -1,18 +1,32 @@
 """State strategies: how the shared transcript becomes model context.
 
-M1 implements only `full_history`. `sliding_window(k)` and `rolling_summary`
-are M4 work.
+Every node calls `build_context(state, keep_recent)` and gets back the
+transcript text plus any state updates to merge (only `rolling_summary`
+produces updates).
+
+- full_history:     every message so far.
+- sliding_window:   the last `window_k` messages.
+- rolling_summary:  a running summary of older messages + the unsummarized
+                    tail. When the tail grows past 2 x keep_recent, everything
+                    except the last keep_recent messages is folded into the
+                    summary with one `summarizer` LLM call (which is traced and
+                    counted in the request's cost).
+
+The question, and for answer/critic the retrieved passages, are always given
+to nodes separately, so strategies only change how much transcript is carried.
 """
 
 from __future__ import annotations
 
-from app.state import Message, Strategy
+from app import llm
+from app.state import GraphState, Message
 
-
-def select_context(messages: list[Message], strategy: Strategy) -> list[Message]:
-    if strategy == "full_history":
-        return list(messages)
-    raise NotImplementedError(f"strategy {strategy!r} is not implemented yet (planned for M4)")
+SUMMARIZER_SYSTEM = (
+    "You maintain a running summary of a multi-agent question-answering session. "
+    "Merge the existing summary and the new transcript lines into one concise summary "
+    "(at most 150 words). Keep sub-queries tried, document IDs found, key facts, and critic feedback. "
+    "Reply with the summary text only."
+)
 
 
 def render_transcript(messages: list[Message]) -> str:
@@ -23,6 +37,38 @@ def render_transcript(messages: list[Message]) -> str:
     return "\n".join(lines)
 
 
-def context_block(messages: list[Message], strategy: Strategy) -> str:
-    """Transcript text handed to a node, after the strategy is applied."""
-    return render_transcript(select_context(messages, strategy))
+def summarize(previous: str, messages: list[Message]) -> str:
+    prompt = (
+        f"Existing summary:\n{previous or '(none)'}\n\n"
+        f"New transcript lines:\n{render_transcript(messages)}\n\n"
+        "Updated summary:"
+    )
+    resp = llm.generate("summarizer", SUMMARIZER_SYSTEM, [{"role": "user", "content": prompt}])
+    return resp.text.strip()
+
+
+def build_context(state: GraphState, keep_recent: int) -> tuple[str, dict]:
+    messages = state["messages"]
+    strategy = state["strategy"]
+
+    if strategy == "full_history":
+        return render_transcript(messages), {}
+
+    if strategy == "sliding_window":
+        k = state.get("window_k") or 1
+        return render_transcript(messages[-k:]), {}
+
+    if strategy == "rolling_summary":
+        upto = state.get("summarized_upto", 0)
+        summary = state.get("summary", "")
+        updates: dict = {}
+        if len(messages) - upto > 2 * keep_recent:
+            fold_end = len(messages) - keep_recent
+            summary = summarize(summary, messages[upto:fold_end])
+            upto = fold_end
+            updates = {"summary": summary, "summarized_upto": upto}
+        tail = render_transcript(messages[upto:])
+        text = f"[summary of earlier messages] {summary}\n{tail}" if summary else tail
+        return text, updates
+
+    raise ValueError(f"unknown strategy {strategy!r}")

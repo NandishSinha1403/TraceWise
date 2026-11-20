@@ -5,3 +5,8 @@ __pycache__/
 .pytest_cache/
 .env
 data/chroma/
+data/metrics.sqlite*
+results/_smoke/
+eval/questions.draft.jsonl
+build/
+results/run_all.log

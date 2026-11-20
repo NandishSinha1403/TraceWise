@@ -1,0 +1,290 @@
+{
+  "uid": "tracewise",
+  "title": "TraceWise: cost and tokens/sec",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "tags": [
+    "tracewise"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "tracewise-sqlite"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "tracewise-sqlite"
+          },
+          "queryText": "SELECT COUNT(*) AS requests FROM requests",
+          "rawQueryText": "SELECT COUNT(*) AS requests FROM requests",
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "title": "Mean cost / request (USD)",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "tracewise-sqlite"
+      },
+      "description": "Paid-tier list-price estimate from config/prices.yaml. Actual spend on the Gemini API free tier is $0.",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "tracewise-sqlite"
+          },
+          "queryText": "SELECT AVG(total_cost_usd) AS cost FROM requests WHERE errors = '[]'",
+          "rawQueryText": "SELECT AVG(total_cost_usd) AS cost FROM requests WHERE errors = '[]'",
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "title": "Mean decode tokens/sec",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "tracewise-sqlite"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "tracewise-sqlite"
+          },
+          "queryText": "SELECT AVG(decode_tps) AS tps FROM llm_calls WHERE call_type = 'llm' AND decode_tps IS NOT NULL",
+          "rawQueryText": "SELECT AVG(decode_tps) AS tps FROM llm_calls WHERE call_type = 'llm' AND decode_tps IS NOT NULL",
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "Calls retried (rate limits)",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "tracewise-sqlite"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "tracewise-sqlite"
+          },
+          "queryText": "SELECT COUNT(*) AS retried FROM llm_calls WHERE attempts > 1",
+          "rawQueryText": "SELECT COUNT(*) AS retried FROM llm_calls WHERE attempts > 1",
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "Cost per request over time (USD)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "tracewise-sqlite"
+      },
+      "description": "Paid-tier list-price estimate from config/prices.yaml. Actual spend on the Gemini API free tier is $0.",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "tracewise-sqlite"
+          },
+          "queryText": "SELECT finished_at AS time, total_cost_usd AS cost_usd FROM requests WHERE errors = '[]' ORDER BY finished_at",
+          "rawQueryText": "SELECT finished_at AS time, total_cost_usd AS cost_usd FROM requests WHERE errors = '[]' ORDER BY finished_at",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Decode tokens/sec per LLM call",
+      "type": "timeseries",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "tracewise-sqlite"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "tracewise-sqlite"
+          },
+          "queryText": "SELECT started_at AS time, decode_tps FROM llm_calls WHERE call_type = 'llm' AND decode_tps IS NOT NULL ORDER BY started_at",
+          "rawQueryText": "SELECT started_at AS time, decode_tps FROM llm_calls WHERE call_type = 'llm' AND decode_tps IS NOT NULL ORDER BY started_at",
+          "queryType": "time series",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "By strategy",
+      "type": "table",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "tracewise-sqlite"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "tracewise-sqlite"
+          },
+          "queryText": "SELECT strategy, COUNT(*) AS requests, AVG(total_cost_usd) AS mean_cost_usd, AVG(total_latency_ms) AS mean_latency_ms, AVG(total_latency_ms - backoff_ms) AS mean_latency_excl_backoff_ms, AVG(n_llm_calls) AS mean_llm_calls, AVG(input_tokens) AS mean_input_tokens FROM requests WHERE errors = '[]' GROUP BY strategy ORDER BY strategy",
+          "rawQueryText": "SELECT strategy, COUNT(*) AS requests, AVG(total_cost_usd) AS mean_cost_usd, AVG(total_latency_ms) AS mean_latency_ms, AVG(total_latency_ms - backoff_ms) AS mean_latency_excl_backoff_ms, AVG(n_llm_calls) AS mean_llm_calls, AVG(input_tokens) AS mean_input_tokens FROM requests WHERE errors = '[]' GROUP BY strategy ORDER BY strategy",
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "By node",
+      "type": "table",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "tracewise-sqlite"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "tracewise-sqlite"
+          },
+          "queryText": "SELECT node, COUNT(*) AS calls, AVG(decode_tps) AS mean_decode_tps, AVG(ttft_ms) AS mean_ttft_ms, AVG(latency_ms) AS mean_latency_ms, AVG(input_tokens) AS mean_input_tokens, AVG(output_tokens) AS mean_output_tokens, SUM(cost_usd) AS total_cost_usd FROM llm_calls WHERE call_type IN ('llm', 'judge') GROUP BY node ORDER BY node",
+          "rawQueryText": "SELECT node, COUNT(*) AS calls, AVG(decode_tps) AS mean_decode_tps, AVG(ttft_ms) AS mean_ttft_ms, AVG(latency_ms) AS mean_latency_ms, AVG(input_tokens) AS mean_input_tokens, AVG(output_tokens) AS mean_output_tokens, SUM(cost_usd) AS total_cost_usd FROM llm_calls WHERE call_type IN ('llm', 'judge') GROUP BY node ORDER BY node",
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    }
+  ]
+}

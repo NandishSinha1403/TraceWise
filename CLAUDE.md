@@ -6,7 +6,9 @@ Read `PROJECT_SPEC.md` first. It defines scope, architecture, metrics, the state
 - Do not invent numbers. Every metric, cost, latency, or judge score in any doc must come from a run whose raw output is saved under `results/`.
 - Do not fill in `<FILL: ...>` placeholders with guesses. Ask the user, or leave the placeholder and say so.
 - Keep prices in `config/prices.yaml`, not hard-coded. Mark prices with the date they were checked.
-- Use Python 3.11+, LangGraph, FastAPI, and the Vertex AI SDK (`google-cloud-aiplatform`). Use OpenTelemetry for spans.
+- Use Python 3.11+, LangGraph, FastAPI, and the `google-genai` SDK. The default real backend is the Gemini API free tier (`LLM_BACKEND=gemini_api`); a Vertex AI backend exists but needs billing. Use OpenTelemetry for spans, exported to a local Jaeger.
+- Everything must run at no cost: no billing account and no free-trial credits. Ask the user before adding anything that needs billing.
+- Secrets (API keys) go only in `.env`, which is gitignored. Never put them in `.env.example`, code, docs, or command output.
 - Pin dependencies in `pyproject.toml` or `requirements.txt`.
 
 ## Working order
@@ -25,7 +27,7 @@ app/
   tracing/
     middleware.py   # wraps LLM and tool calls, records per-call metrics
     rollup.py       # per-request totals
-    otel.py         # OpenTelemetry setup -> Cloud Trace
+    otel.py         # OpenTelemetry setup -> Jaeger (local Docker)
   api.py            # FastAPI /ask
 config/prices.yaml
 eval/
@@ -48,5 +50,5 @@ RESULTS.md          # written only from files in results/
 ## Before you say something is done
 - Run the tests.
 - Run the service locally and send one request.
-- For deployment, confirm the Cloud Run URL responds and spans appear in Cloud Trace.
+- For deployment, confirm the Cloud Run URL responds, and that spans appear in Jaeger for a local run.
 - For results, confirm `RESULTS.md` only cites numbers that `eval.summarize` prints from the saved files.

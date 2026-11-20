@@ -11,7 +11,7 @@ from typing import Callable
 
 from app import llm
 from app.state import CriticVerdict, GraphState, Message
-from app.strategies import context_block
+from app.strategies import build_context
 from app.tools.search import format_results
 
 SYSTEM = (
@@ -26,11 +26,11 @@ SYSTEM = (
 RETRY_TARGETS = {"retry_planner": "planner", "retry_retriever": "retriever"}
 
 
-def build_prompt(state: GraphState) -> str:
+def build_prompt(state: GraphState, transcript: str) -> str:
     return "\n".join(
         [
             "Transcript so far:",
-            context_block(state["messages"], state["strategy"]),
+            transcript,
             "",
             f"Question: {state['question']}",
             "Passages:",
@@ -62,12 +62,16 @@ def decide(verdict: CriticVerdict, retries: int, max_retries: int) -> tuple[str,
     return "end", retries, False  # accept, or invalid output: stop rather than loop
 
 
-def make_critic_node(max_retries: int) -> Callable[[GraphState], dict]:
+def make_critic_node(max_retries: int, keep_recent: int) -> Callable[[GraphState], dict]:
     def critic_node(state: GraphState) -> dict:
-        resp = llm.generate("critic", SYSTEM, [{"role": "user", "content": build_prompt(state)}], json_output=True)
+        transcript, ctx_updates = build_context(state, keep_recent)
+        resp = llm.generate(
+            "critic", SYSTEM, [{"role": "user", "content": build_prompt(state, transcript)}], json_output=True
+        )
         verdict = parse_verdict(resp.text)
         route, retries, capped = decide(verdict, state.get("critic_retries", 0), max_retries)
         return {
+            **ctx_updates,
             "critic_verdict": verdict,
             "critic_retries": retries,
             "capped": capped,

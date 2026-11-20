@@ -1,0 +1,2 @@
+{"id": "example-1", "question": "What colour is the lamp of the Varnholt Lighthouse?", "reference": "Green; it flashes every six seconds.", "source_doc_id": "fixture_lighthouse.md"}
+{"id": "example-2", "question": "Which apple variety grows at the Pellam Orchard?", "reference": "The Ember Pippin.", "source_doc_id": "fixture_orchard.md"}

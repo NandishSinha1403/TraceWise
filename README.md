@@ -1,10 +1,20 @@
 # TraceWise
 
-A multi-agent RAG assistant (planner → retriever → answer → critic) built with LangGraph, served by FastAPI, using Gemini on Vertex AI. Later milestones add per-call LLM tracing and a state-strategy experiment. See `PROJECT_SPEC.md`.
+A multi-agent RAG assistant (planner → retriever → answer → critic) built with LangGraph and served by FastAPI. It uses Gemini through the Gemini API free tier. A tracing layer records tokens, time to first token, decode tokens/sec, latency, and cost for every model and tool call. The experiment compares three ways of carrying state between agents: `full_history`, `sliding_window(k)`, and `rolling_summary`.
 
-**Status: M1 (graph runs locally).** No tracing, deployment, eval, or dashboard yet.
+Everything runs at no cost: no billing account and no free-trial credits. See `PROJECT_SPEC.md`.
 
-> **No results are reported until M4.** Nothing in this repository is a measured cost, latency, or quality number yet.
+> **No results are reported yet.** `RESULTS.md` is written only after the M4 runs, from numbers that `python -m eval.summarize` prints from files in `results/`.
+
+## Status
+
+| Milestone | Code | Verified |
+|---|---|---|
+| M1 graph + `/ask` | done | tests; local request; real Gemini wiring check on synthetic fixtures |
+| M2 tracing | done | tests; spans and SQLite rows from a local run |
+| M3 deploy | Dockerfile, compose, Cloud Run script | not yet built or deployed (needs Docker running and a Starter Tier project) |
+| M4 experiment | runner, judge, summarize | fake-backend smoke tests only; needs your documents and eval set |
+| M5 dashboard | Grafana provisioning + dashboard | not yet opened (needs Docker) |
 
 ## Graph
 
@@ -16,89 +26,131 @@ critic: accept -> END
         retry at cap -> END with capped: true and the latest draft answer
 ```
 
-State is in `app/state.py`. The `strategy` field is fixed to `full_history` in M1. `sliding_window` and `rolling_summary` come in M4 (`app/strategies.py`).
-Every model call goes through `app/llm.py` (`generate()` and `embed()`). M2 tracing will wrap those two functions.
+Every model call goes through `app/llm.py` (`generate()` and `embed()`), which wraps it in the tracing middleware.
 
 ## Setup
 
-Requires Python 3.11+. M1 was built and tested on Python 3.12.4.
+Requires Python 3.11+. Built and tested on Python 3.12.4.
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
+pytest -q
 ```
 
-Direct dependencies are pinned in `pyproject.toml`. `requirements.lock` has the full resolved set from the M1 install (`pip install -r requirements.lock` reproduces it).
+Direct dependencies are pinned in `pyproject.toml`. `requirements.lock` is the full runtime set; the Docker image installs from it.
 
 ## Configuration
 
-All settings are environment variables (see `.env.example`). No model IDs, project IDs, or regions have defaults. The numeric defaults below are **development defaults, not tuned values**.
+Settings come from environment variables, or from `.env`, which is gitignored and loaded automatically. Values set in the shell win over `.env`. `.env.example` lists the names. **API keys go only in `.env`.**
+Numeric defaults are **development defaults, not tuned values**.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `LLM_BACKEND` | `vertex` or `fake` | `fake` |
-| `GCP_PROJECT` | Vertex AI project ID | none (required when `LLM_BACKEND=vertex`) |
-| `GCP_REGION` | Vertex AI region | none (required when `LLM_BACKEND=vertex`) |
-| `GEN_MODEL_ID` | Gemini model for planner, retriever, answer, critic | none (required when `LLM_BACKEND=vertex`) |
-| `JUDGE_MODEL_ID` | Gemini model for the judge (read but unused in M1) | none |
-| `EMBEDDING_MODEL_ID` | Embedding model for ingestion and queries | none (required when `LLM_BACKEND=vertex`) |
-| `GEN_TEMPERATURE` | Generation temperature | none (model default is used when unset) |
-| `MAX_CRITIC_RETRIES` | Critic retry cap (N) | `2` (development default) |
-| `MAX_RETRIEVER_STEPS` | Cap on ReAct tool-call steps per retriever run | `4` (development default) |
-| `SEARCH_TOP_K` | Passages returned per search | `4` (development default) |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Ingestion chunking, in characters | `1000` / `150` (development defaults) |
-| `VECTOR_STORE` | `chroma` in M1 | `chroma` |
-| `DOCS_DIR` | Source documents folder (`.txt`, `.md`) | `data/docs` |
-| `CHROMA_DIR` | Chroma persistence folder | `data/chroma` |
+| `LLM_BACKEND` | `gemini_api` (free tier), `vertex` (needs billing), or `fake` (tests) | `fake` |
+| `GEMINI_API_KEY` | AI Studio API key | none (required for `gemini_api`) |
+| `GEN_MODEL_ID` | Model for planner, retriever, answer, critic, summarizer | none (required) |
+| `EMBEDDING_MODEL_ID` | Embedding model | none (required) |
+| `JUDGE_MODEL_ID` | Judge model for the eval | none (required for the eval) |
+| `GEN_TEMPERATURE` / `JUDGE_TEMPERATURE` | Temperatures | model default when unset |
+| `GEN_THINKING_BUDGET` | Gemini 2.5 thinking budget (`0` turns thinking off) | model default when unset |
+| `GEN_THINKING_LEVEL` | Gemini 3+ thinking level: `minimal`, `low`, `medium`, `high` (Gemini 3+ rejects a budget of 0; set one or the other) | model default when unset |
+| `LLM_MAX_RETRIES` | Retries on 429/500/503 with exponential backoff | `5` |
+| `MAX_CRITIC_RETRIES` | Critic retry cap (N) | `2` |
+| `MAX_RETRIEVER_STEPS` | ReAct tool-call steps per retriever run | `4` |
+| `SEARCH_TOP_K` | Passages per search | `4` |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Ingestion chunking, in characters | `1000` / `150` |
+| `STATE_STRATEGY` | `full_history`, `sliding_window`, `rolling_summary` (for the API; the eval takes `--strategy`) | `full_history` |
+| `WINDOW_K` | Messages kept by `sliding_window` | `4` |
+| `SUMMARY_KEEP_RECENT` | Messages kept verbatim by `rolling_summary` | `3` |
+| `METRICS_DB` | SQLite file for metrics rows (`none` disables) | `data/metrics.sqlite` (off for `fake`) |
+| `PRICES_FILE` | Price table | `config/prices.yaml` |
+| `OTEL_TRACES_EXPORTER` | `none`, `console`, or `otlp` (Jaeger) | `none` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP traces endpoint | `http://localhost:4318/v1/traces` |
+| `LOG_METRICS_JSON` | Also log each call as one JSON line (on in Docker) | `false` |
+| `VECTOR_STORE` / `DOCS_DIR` / `CHROMA_DIR` | Store, source docs, Chroma folder | `chroma` / `data/docs` / `data/chroma` |
 | `FAKE_CRITIC_VERDICT` | Fake backend only: `accept`, `retry_planner`, `retry_retriever` | `accept` |
 | `HOST` / `PORT` | Server bind address | `127.0.0.1` / `8000` |
 
-Chroma collections are named after the embedder (`tracewise-fake`, or `tracewise-<EMBEDDING_MODEL_ID>`), so fake and real vectors never mix.
-
-## Offline smoke test (no network, no credentials)
-
-The `fake` backend returns fixed responses for each role. It exists for tests and this smoke run only. The fixture documents in `tests/fixtures/docs/` are synthetic and are never used for results.
+## Run the service
 
 ```bash
-pytest -q
+python -m app.ingest            # embed data/docs into Chroma (add --reset to rebuild)
+python -m app.api
+curl -s -X POST localhost:8000/ask -H 'content-type: application/json' -d '{"question":"..."}'
+```
 
+The response has `answer`, `cited_doc_ids`, `critic_retries`, `capped`, `critic_verdict`, `steps`, and `usage`, which holds the per-request rollup: total cost, total latency, LLM calls, agent hops, critic retries, tokens, and backoff time.
+
+Offline, with no network:
+
+```bash
 LLM_BACKEND=fake DOCS_DIR=tests/fixtures/docs python -m app.ingest --reset
 LLM_BACKEND=fake python -m app.api
-# in another shell:
-curl -s -X POST localhost:8000/ask -H 'content-type: application/json' \
-  -d '{"question":"What colour is the lamp of the Varnholt Lighthouse?"}'
 ```
 
-Force the critic to reject, with a retry cap of 0 (expect one critic pass and `"capped": true`):
+## Tracing (M2)
+
+Each LLM call records: model id, node, strategy, request id, input/output/thinking tokens, TTFT, latency, decode tokens/sec = output tokens / (latency − TTFT), cost, attempts, and backoff.
+Tool and embedding calls record latency. Rows go to `METRICS_DB`, with tables `llm_calls` and `requests`, and spans go to OpenTelemetry.
+
+- **Cost:** input × input price + (output + thinking) × output price, from `config/prices.yaml`. It is a paid-tier list-price estimate; actual spend on the free tier is $0. The prices are marked `verified: false` until checked against Google's pricing page.
+- **Embedding calls:** the Gemini API does not return token counts for them, so their cost is recorded as unknown.
+- **Retries and backoff:** rate-limit retries are counted, and the time spent waiting is recorded separately, so latency can be reported with and without it.
+- **Decode tokens/sec:** it is only defined when output streams in more than one chunk, and it is noisy for short outputs.
+
+## Local stack: Jaeger + Grafana (M2/M5)
+
+Needs Docker Desktop running.
 
 ```bash
-LLM_BACKEND=fake MAX_CRITIC_RETRIES=0 FAKE_CRITIC_VERDICT=retry_retriever python -m app.api
+docker compose up --build            # app :8000, Jaeger :16686, Grafana :3000
 ```
 
-Response fields: `request_id`, `question`, `strategy`, `answer`, `cited_doc_ids`, `critic_retries`, `capped`, `critic_verdict`, `steps` (the node sequence visited).
+Or run only Jaeger and Grafana and keep the app on the host:
 
-## Real-model run (Vertex AI)
+```bash
+docker compose up jaeger grafana
+OTEL_TRACES_EXPORTER=otlp python -m app.api
+```
 
-1. Authenticate: `gcloud auth application-default login`. Enable the Vertex AI API in the project.
-2. Put the corpus (`.txt` / `.md`) in `data/docs/`.
-3. Set the variables and ingest:
-   ```bash
-   export LLM_BACKEND=vertex GCP_PROJECT=... GCP_REGION=... GEN_MODEL_ID=... EMBEDDING_MODEL_ID=...
-   python -m app.ingest
-   python -m app.api
-   ```
-4. Send the same `curl` request as above, with a question about your corpus.
+The Grafana dashboard "TraceWise: cost and tokens/sec" reads `data/metrics.sqlite`.
 
-If a required variable is missing, the service exits with an error that names it.
+## Deploy to Cloud Run (M3)
+
+`deploy/cloudrun_deploy.sh` targets a Starter Tier project (no billing account). It stages only the files the image needs, so `.env` is never uploaded. The Chroma index is baked into the image, so run `python -m app.ingest` first.
+
+```bash
+GCP_PROJECT=<project> GCP_REGION=<region> deploy/cloudrun_deploy.sh
+```
+
+Image only: `docker build -f deploy/Dockerfile -t tracewise .`
+
+## Experiment (M4)
+
+```bash
+python -m eval.build_questions --n 30     # drafts eval/questions.draft.jsonl from data/docs
+# review it by hand, then save as eval/questions.jsonl, and don't change it afterwards
+python -m eval.run_eval --strategy full_history
+python -m eval.run_eval --strategy sliding_window --k 4
+python -m eval.run_eval --strategy rolling_summary
+python -m eval.summarize results/                # add --markdown for a table
+```
+
+Each run writes `results/<strategy>_<timestamp>/` with `run_meta.json`, `prices.yaml`, `requests.csv`, `calls.csv`, and `raw.jsonl`.
+If the free-tier daily quota runs out, the run stops after 3 consecutive errors. Continue later with `python -m eval.run_eval --resume <run folder>`. Use `--pace <seconds>` to slow down between questions.
+The judge uses the fixed rubric in `eval/judge_prompt.md`. Judge calls are logged but excluded from per-request cost.
 
 ## Layout
 
 ```
-app/        config, state, strategies, llm (single model entry point), vectorstore, ingest,
-            graph, api, agents/ (planner, retriever, answer, critic), tools/search.py
-config/     prices.yaml arrives in M2
-eval/       M4
-results/    M4 run outputs
-tests/      offline tests with the fake backend; fixtures/docs are synthetic
+app/          config, state, strategies, llm (single model entry point), vectorstore, ingest, graph, api
+app/agents/   planner, retriever (ReAct loop), answer, critic
+app/tracing/  metrics (pure math), middleware, prices, store (SQLite), otel
+config/       prices.yaml
+eval/         build_questions, run_eval, judge (+ judge_prompt.md), summarize
+deploy/       Dockerfile, cloudrun_deploy.sh, grafana/
+results/      eval run outputs
+tests/        offline tests (fake backend); tests/fixtures/docs are synthetic
 ```

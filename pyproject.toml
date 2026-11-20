@@ -4,17 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tracewise"
-version = "0.1.0"
-description = "Multi-agent RAG assistant with LLM cost and latency tracing (M1: graph runs locally)."
+version = "0.2.0"
+description = "Multi-agent RAG assistant with LLM cost and latency tracing."
 requires-python = ">=3.11"
 dependencies = [
     "langgraph==1.2.23",
     "fastapi==0.165.0",
     "uvicorn==0.54.0",
     "pydantic==2.14.3",
-    "google-cloud-aiplatform==2.10.0",
     "google-genai==2.34.0",
     "chromadb==1.5.9",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
+    "opentelemetry-exporter-otlp-proto-http==1.45.2",
+    "pyyaml==6.0.3",
 ]
 
 [project.optional-dependencies]

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Callable
+
 from app import llm
 from app.state import GraphState, Message
-from app.strategies import context_block
+from app.strategies import build_context
 
 SYSTEM = (
     "You are the planner in a retrieval-augmented question-answering system. "
@@ -14,10 +16,10 @@ SYSTEM = (
 )
 
 
-def build_prompt(state: GraphState) -> str:
+def build_prompt(state: GraphState, transcript: str) -> str:
     parts = [
         "Transcript so far:",
-        context_block(state["messages"], state["strategy"]),
+        transcript,
         "",
         f"Question: {state['question']}",
     ]
@@ -27,19 +29,27 @@ def build_prompt(state: GraphState) -> str:
     return "\n".join(parts)
 
 
-def planner_node(state: GraphState) -> dict:
-    resp = llm.generate("planner", SYSTEM, [{"role": "user", "content": build_prompt(state)}], json_output=True)
+def make_planner_node(keep_recent: int) -> Callable[[GraphState], dict]:
+    def planner_node(state: GraphState) -> dict:
+        transcript, ctx_updates = build_context(state, keep_recent)
+        return {**ctx_updates, **plan(state, transcript)}
+
+    return planner_node
+
+
+def plan(state: GraphState, transcript: str) -> dict:
+    resp = llm.generate("planner", SYSTEM, [{"role": "user", "content": build_prompt(state, transcript)}], json_output=True)
     data = llm.parse_json(resp.text) or {}
-    plan = str(data.get("plan") or "").strip()
+    plan_text = str(data.get("plan") or "").strip()
     sub_queries = [str(q).strip() for q in data.get("sub_queries") or [] if str(q).strip()]
     if not sub_queries:
         # Model gave no usable sub-queries; fall back to searching the question itself.
         sub_queries = [state["question"]]
-    if not plan:
-        plan = "Search for: " + "; ".join(sub_queries)
-    summary = plan + "\nSub-queries:\n" + "\n".join(f"- {q}" for q in sub_queries)
+    if not plan_text:
+        plan_text = "Search for: " + "; ".join(sub_queries)
+    summary = plan_text + "\nSub-queries:\n" + "\n".join(f"- {q}" for q in sub_queries)
     return {
-        "plan": plan,
+        "plan": plan_text,
         "sub_queries": sub_queries,
         "messages": [Message(role="assistant", name="planner", content=summary)],
         "steps": ["planner"],

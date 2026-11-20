@@ -10,7 +10,8 @@ from typing import Callable
 
 from app import llm
 from app.state import GraphState, Message, Passage
-from app.strategies import context_block
+from app.strategies import build_context
+from app.tracing import middleware as tracing
 from app.tools.search import SEARCH_TOOL, SearchDocuments, format_results
 
 SYSTEM = (
@@ -21,10 +22,10 @@ SYSTEM = (
 )
 
 
-def build_prompt(state: GraphState) -> str:
+def build_prompt(state: GraphState, transcript: str) -> str:
     parts = [
         "Transcript so far:",
-        context_block(state["messages"], state["strategy"]),
+        transcript,
         "",
         f"Question: {state['question']}",
         "Sub-queries:",
@@ -46,9 +47,10 @@ def merge_passages(existing: list[Passage], new: list[Passage]) -> list[Passage]
     return merged
 
 
-def make_retriever_node(search: SearchDocuments, max_steps: int) -> Callable[[GraphState], dict]:
+def make_retriever_node(search: SearchDocuments, max_steps: int, keep_recent: int) -> Callable[[GraphState], dict]:
     def retriever_node(state: GraphState) -> dict:
-        scratch: list[llm.ChatMessage] = [{"role": "user", "content": build_prompt(state)}]
+        transcript_text, ctx_updates = build_context(state, keep_recent)
+        scratch: list[llm.ChatMessage] = [{"role": "user", "content": build_prompt(state, transcript_text)}]
         found: list[Passage] = []
         transcript: list[Message] = []
         tool_steps = 0
@@ -66,7 +68,8 @@ def make_retriever_node(search: SearchDocuments, max_steps: int) -> Callable[[Gr
                     result_text = f"Unknown tool {call.name!r}."
                 else:
                     query = str(call.args.get("query", ""))
-                    passages = search(query)
+                    with tracing.tool_call(call.name):
+                        passages = search(query)
                     found = merge_passages(found, passages)
                     result_text = format_results(passages)
                     transcript.append(
@@ -77,6 +80,7 @@ def make_retriever_node(search: SearchDocuments, max_steps: int) -> Callable[[Gr
                 )
 
         return {
+            **ctx_updates,
             "retrieved": merge_passages(state.get("retrieved", []), found),
             "messages": transcript,
             "steps": ["retriever"],

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Callable
+
 from app import llm
 from app.state import GraphState, Message
-from app.strategies import context_block
+from app.strategies import build_context
 from app.tools.search import format_results
 
 SYSTEM = (
@@ -15,11 +17,11 @@ SYSTEM = (
 )
 
 
-def build_prompt(state: GraphState) -> str:
+def build_prompt(state: GraphState, transcript: str) -> str:
     return "\n".join(
         [
             "Transcript so far:",
-            context_block(state["messages"], state["strategy"]),
+            transcript,
             "",
             f"Question: {state['question']}",
             "Passages:",
@@ -28,8 +30,16 @@ def build_prompt(state: GraphState) -> str:
     )
 
 
-def answer_node(state: GraphState) -> dict:
-    resp = llm.generate("answer", SYSTEM, [{"role": "user", "content": build_prompt(state)}], json_output=True)
+def make_answer_node(keep_recent: int) -> Callable[[GraphState], dict]:
+    def answer_node(state: GraphState) -> dict:
+        transcript, ctx_updates = build_context(state, keep_recent)
+        return {**ctx_updates, **draft(state, transcript)}
+
+    return answer_node
+
+
+def draft(state: GraphState, transcript: str) -> dict:
+    resp = llm.generate("answer", SYSTEM, [{"role": "user", "content": build_prompt(state, transcript)}], json_output=True)
     data = llm.parse_json(resp.text)
     if data is None:
         answer, cited = resp.text.strip(), []

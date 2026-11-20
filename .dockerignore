@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.venv/
+.git/
+**/__pycache__/
+.pytest_cache/
+*.egg-info/
+results/
+tests/
+eval/
+data/docs/
+data/metrics.sqlite*
+deploy/grafana/

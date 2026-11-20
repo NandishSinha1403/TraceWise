@@ -1,0 +1,45 @@
+# Free local stack: the app, Jaeger (traces), and Grafana (dashboard).
+#   docker compose up --build
+# App:     http://localhost:8000/ask
+# Jaeger:  http://localhost:16686
+# Grafana: http://localhost:3000  (anonymous viewer access, admin/admin to edit)
+services:
+  app:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8000"
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      METRICS_DB: /srv/data/metrics.sqlite
+    user: "0"   # write the bind-mounted ./data folder
+    volumes:
+      - ./data:/srv/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # UI
+      - "4318:4318"     # OTLP/HTTP (also used by `python -m app.api` running on the host)
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_INSTALL_PLUGINS: frser-sqlite-datasource
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./data:/var/lib/tracewise
+    ports:
+      - "3000:3000"

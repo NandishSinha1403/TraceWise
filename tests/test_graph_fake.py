@@ -32,11 +32,11 @@ def test_retriever_respects_step_cap(make_env, monkeypatch):
     retriever_calls = []
 
     class Greedy:
-        def generate(self, role, system, messages, tools, json_output):
+        def generate(self, role, system, messages, tools, json_output, options):
             if role == "retriever":
                 retriever_calls.append(1)
                 return LLMResponse(text="", tool_calls=[ToolCall("search_documents", {"query": "orchard"})])
-            return fake.generate(role, system, messages, tools, json_output)
+            return fake.generate(role, system, messages, tools, json_output, options)
 
         def embed(self, texts, task):
             return fake.embed(texts, task)

@@ -18,6 +18,7 @@ EXPECTED_KEYS = {
     "capped",
     "critic_verdict",
     "steps",
+    "usage",
 }
 
 
@@ -33,6 +34,11 @@ def test_ask_returns_expected_shape(make_env):
     assert body["critic_retries"] == 0
     assert body["capped"] is False
     assert body["steps"] == ["planner", "retriever", "answer", "critic"]
+    usage = body["usage"]
+    assert usage["n_llm_calls"] == 5  # planner, retriever x2 (search, then stop), answer, critic
+    assert usage["n_tool_calls"] == 1
+    assert usage["n_agent_hops"] == 4
+    assert usage["n_critic_retries"] == 0
 
 
 def test_ask_rejects_blank_question(make_env):
