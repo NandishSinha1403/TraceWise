@@ -7,6 +7,7 @@
 # On a quota stop it waits 15 minutes and resumes. If a resume makes no
 # progress, it waits until 00:10 Pacific time (when daily quotas reset).
 set -uo pipefail
+export PYTHONUNBUFFERED=1  # so progress lines reach the log immediately
 cd "$(dirname "$0")/.."
 source .venv/bin/activate
 

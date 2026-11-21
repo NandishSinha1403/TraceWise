@@ -3,6 +3,11 @@
 #
 #   GCP_PROJECT=my-project GCP_REGION=<region> deploy/cloudrun_deploy.sh
 #
+# Starter Tier projects cannot enable Cloud Build or Artifact Registry, so a
+# source deploy may be refused there. Deploy a prebuilt public image instead:
+#
+#   IMAGE=docker.io/<user>/tracewise:<tag> GCP_PROJECT=... GCP_REGION=... deploy/cloudrun_deploy.sh
+#
 # Before running:
 #   - gcloud is installed and logged in (gcloud auth login)
 #   - python -m app.ingest has populated data/chroma (it is baked into the image)
@@ -31,6 +36,12 @@ ENVFILE="$(mktemp)"
 trap 'rm -rf "$STAGE" "$ENVFILE"' EXIT
 chmod 600 "$ENVFILE"
 
+if [[ -n "${IMAGE:-}" ]]; then
+  DEPLOY_FROM=(--image "$IMAGE")
+else
+  DEPLOY_FROM=(--source "$STAGE")
+fi
+
 cp "$ROOT/deploy/Dockerfile" "$STAGE/Dockerfile"
 cp "$ROOT/requirements.lock" "$ROOT/pyproject.toml" "$STAGE/"
 cp -R "$ROOT/app" "$ROOT/config" "$STAGE/"
@@ -48,7 +59,7 @@ find "$STAGE" -name __pycache__ -type d -prune -exec rm -rf {} +
 gcloud run deploy "$SERVICE" \
   --project "$GCP_PROJECT" \
   --region "$GCP_REGION" \
-  --source "$STAGE" \
+  "${DEPLOY_FROM[@]}" \
   --env-vars-file "$ENVFILE" \
   --max-instances 1 \
   --memory 1Gi \

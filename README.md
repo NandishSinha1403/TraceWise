@@ -4,17 +4,19 @@ A multi-agent RAG assistant (planner → retriever → answer → critic) built 
 
 Everything runs at no cost: no billing account and no free-trial credits. See `PROJECT_SPEC.md`.
 
-> **No results are reported yet.** `RESULTS.md` is written only after the M4 runs, from numbers that `python -m eval.summarize` prints from files in `results/`.
+> Results are in `RESULTS.md`. It is written only from numbers that `python -m eval.summarize` prints from files in `results/`.
 
 ## Status
 
 | Milestone | Code | Verified |
 |---|---|---|
-| M1 graph + `/ask` | done | tests; local request; real Gemini wiring check on synthetic fixtures |
-| M2 tracing | done | tests; spans and SQLite rows from a local run |
-| M3 deploy | Dockerfile, compose, Cloud Run script | not yet built or deployed (needs Docker running and a Starter Tier project) |
-| M4 experiment | runner, judge, summarize | fake-backend smoke tests only; needs your documents and eval set |
-| M5 dashboard | Grafana provisioning + dashboard | not yet opened (needs Docker) |
+| M1 graph + `/ask` | done | tests; real `/ask` requests against `gemini-3.5-flash-lite` |
+| M2 tracing | done | tests; spans in Jaeger (`request` → `node.*`, `llm.*`, `tool.*`) and SQLite rows from real runs |
+| M3 deploy | Dockerfile, compose, Cloud Run script (source or `IMAGE=` deploy) | local Docker stack runs and answers; Cloud Run not deployed yet |
+| M4 experiment | runner, judge, summarize | all three strategies run on 30 questions; see `RESULTS.md` |
+| M5 dashboard | Grafana provisioning + dashboard | dashboard queries return data from `data/metrics.sqlite` |
+
+The model is `gemini-3.5-flash-lite`. `gemini-2.5-flash`, named in the original spec, is deprecated and its free tier allows only 20 requests per day. The free tier for `gemini-3.5-flash-lite` allows 500 generate requests per day, which is about 80 eval questions. `eval/run_all.sh` runs all three strategies and resumes after quota stops.
 
 ## Graph
 
@@ -95,7 +97,7 @@ LLM_BACKEND=fake python -m app.api
 Each LLM call records: model id, node, strategy, request id, input/output/thinking tokens, TTFT, latency, decode tokens/sec = output tokens / (latency − TTFT), cost, attempts, and backoff.
 Tool and embedding calls record latency. Rows go to `METRICS_DB`, with tables `llm_calls` and `requests`, and spans go to OpenTelemetry.
 
-- **Cost:** input × input price + (output + thinking) × output price, from `config/prices.yaml`. It is a paid-tier list-price estimate; actual spend on the free tier is $0. The prices are marked `verified: false` until checked against Google's pricing page.
+- **Cost:** input × input price + (output + thinking) × output price, from `config/prices.yaml`. It is a paid-tier list-price estimate; actual spend on the free tier is $0. The prices were verified against Google's pricing page on 2026-11-20.
 - **Embedding calls:** the Gemini API does not return token counts for them, so their cost is recorded as unknown.
 - **Retries and backoff:** rate-limit retries are counted, and the time spent waiting is recorded separately, so latency can be reported with and without it.
 - **Decode tokens/sec:** it is only defined when output streams in more than one chunk, and it is noisy for short outputs.

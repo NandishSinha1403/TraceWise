@@ -1,3 +1,15 @@
+# Status (updated 2026-11-21)
+
+Done by Claude:
+- Steps 1–6 and 8: documents, free-tier limits, verified prices, eval set, all three runs, `RESULTS.md`, the local Jaeger + Grafana stack (checked), and pushes to GitHub.
+- Free-tier limits found: `gemini-2.5-flash` allows 20 requests per day and is deprecated, so the project switched to `gemini-3.5-flash-lite`, which allows 500 requests per day.
+
+**Left for you: step 7, Cloud Run deploy (see the chat for steps).** A Starter Tier project is created only by publishing an app from AI Studio Build mode (https://aistudio.google.com/apps). Then run `gcloud auth login`, run `docker login`, and send Claude the project ID and your Docker Hub username.
+
+The original task list follows, for reference.
+
+---
+
 # Your tasks
 
 The code for M1 to M5 is written and tested offline (58 tests). These are the steps only you can do. They are in order, and every step is free: never enable billing or start a free trial. If a step asks for something that needs billing, stop and tell me.

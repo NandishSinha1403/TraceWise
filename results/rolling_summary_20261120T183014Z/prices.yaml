@@ -1,0 +1,34 @@
+# Model prices used to compute cost per call. Unit: USD per 1M tokens.
+#
+# The project runs on the Gemini API FREE tier, so actual spend is $0.
+# These are PAID-tier list prices, used to report what each call WOULD cost.
+#
+# verified: true means the figure was read verbatim from Google's pricing page
+# (https://ai.google.dev/gemini-api/docs/pricing, which redirects to
+# https://aistudio.google.com/docs/pricing) on the `checked` date, Standard tab.
+# eval.summarize prints a warning while any price is unverified.
+
+unit: usd_per_1m_tokens
+
+models:
+  gemini-3.5-flash-lite:
+    input: 0.30          # text / image / video / audio input
+    output: 2.50         # "Output price (including thinking tokens)"
+    checked: 2026-11-20
+    source: Google pricing page, Standard tab, paid tier
+    verified: true
+
+  gemini-2.5-flash:     # deprecated; not used for the experiment (kept for old rows)
+    input: 0.30          # text input
+    output: 2.50         # output, including thinking tokens
+    checked: 2026-11-20
+    source: Google pricing page, Standard tab, paid tier
+    verified: true
+
+  gemini-embedding-001:
+    input: 0.15
+    output: null         # embeddings have no output tokens
+    checked: 2026-11-20
+    source: Google pricing page, Standard tab, paid tier
+    verified: true
+    note: The Gemini API does not return token counts for embedding calls, so embedding cost is recorded as unknown.
