@@ -13,7 +13,7 @@ Build a multi-agent RAG assistant on Google Cloud and add a tracing layer that r
 - ReAct-style tool use for the retriever (search tool calls).
 - Gemini API free tier (AI Studio API key on a Google Cloud project, no billing) for generation, embeddings, and the LLM judge. Generation model: `gemini-3.5-flash-lite` (switched from `gemini-2.5-flash` on 2026-11-20: 2.5-flash is deprecated, reroutes to 3.5-flash-lite from 2026-12-01, and its free tier allows only 20 requests per day). Embedding model: `gemini-embedding-001`. A Vertex AI backend is kept in code for a later paid switch.
 - Vector store: Chroma (local, persisted to disk; bundled with the service when deployed).
-- Deployment on Cloud Run via the Google Cloud Starter Tier (no billing account) in `<FILL: region, fixed when the Starter Tier project is created>`.
+- Deployment on Cloud Run via the Google Cloud Starter Tier (no billing account) in `asia-south1` (Starter Tier region). **Outcome (2026-11-22): refused by the Starter Tier; M3 falls back to local Docker, see README**.
 - Tracing middleware: per-call and per-request metrics, OpenTelemetry spans exported to a local Jaeger (Docker). Cloud Trace is out unless billing is enabled later.
 - State-strategy experiment: `full_history`, `sliding_window(k)`, `rolling_summary`.
 - Eval set and LLM-judge scoring.

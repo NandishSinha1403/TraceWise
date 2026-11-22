@@ -30,6 +30,9 @@ COLUMNS = [
     ("lat_excl_p95_ms", "latency excl. backoff p95 ms"),
     ("cost_mean_usd", "cost/request USD"),
     ("llm_calls_mean", "LLM calls/request"),
+    ("critic_retries_mean", "critic retries/request"),
+    ("tool_calls_mean", "tool calls/request"),
+    ("n_summarizer_calls", "summarizer calls (total)"),
     ("input_tokens_mean", "input tokens/request"),
     ("decode_tps_mean", "decode tok/s mean"),
     ("correctness_mean", "judge correctness"),
@@ -64,10 +67,13 @@ def summarize_run(run_dir: Path) -> dict | None:
     lat_excl = [_f(r, "total_latency_ms") - (_f(r, "backoff_ms") or 0.0) for r in ok if _f(r, "total_latency_ms") is not None]
 
     tps: list[float] = []
+    n_summarizer: int | None = None
     calls_path = run_dir / "calls.csv"
     if calls_path.exists():
+        n_summarizer = 0
         with calls_path.open(encoding="utf-8") as f:
             for c in csv.DictReader(f):
+                n_summarizer += c["node"] == "summarizer"
                 if c["call_type"] == "llm" and c["decode_tps"] not in ("", "None"):
                     tps.append(float(c["decode_tps"]))
 
@@ -84,6 +90,9 @@ def summarize_run(run_dir: Path) -> dict | None:
         "lat_excl_p95_ms": percentile(lat_excl, 95),
         "cost_mean_usd": _mean([_f(r, "total_cost_usd") for r in ok]),
         "llm_calls_mean": _mean([_f(r, "n_llm_calls") for r in ok]),
+        "critic_retries_mean": _mean([_f(r, "critic_retries") for r in ok]),
+        "tool_calls_mean": _mean([_f(r, "n_tool_calls") for r in ok]),
+        "n_summarizer_calls": n_summarizer,
         "input_tokens_mean": _mean([_f(r, "input_tokens") for r in ok]),
         "decode_tps_mean": _mean(tps),
         "correctness_mean": _mean([_f(r, "judge_correctness") for r in judged]),
@@ -111,7 +120,7 @@ def _fmt(key: str, v) -> str:
     if isinstance(v, float):
         if key == "cost_mean_usd":
             return f"{v:.6f}"
-        return f"{v:.2f}" if key in ("correctness_mean", "groundedness_mean", "llm_calls_mean") else f"{v:.1f}"
+        return f"{v:.2f}" if key in ("correctness_mean", "groundedness_mean", "llm_calls_mean", "critic_retries_mean", "tool_calls_mean") else f"{v:.1f}"
     return str(v)
 
 

@@ -12,8 +12,8 @@ Everything runs at no cost: no billing account and no free-trial credits. See `P
 |---|---|---|
 | M1 graph + `/ask` | done | tests; real `/ask` requests against `gemini-3.5-flash-lite` |
 | M2 tracing | done | tests; spans in Jaeger (`request` → `node.*`, `llm.*`, `tool.*`) and SQLite rows from real runs |
-| M3 deploy | Dockerfile, compose, Cloud Run script (source or `IMAGE=` deploy) | local Docker stack runs and answers; Cloud Run not deployed yet |
-| M4 experiment | runner, judge, summarize | all three strategies run on 30 questions; see `RESULTS.md` |
+| M3 deploy | Dockerfile, compose, Cloud Run script (source or `IMAGE=` deploy) | fallback: local Docker stack runs and answers; Cloud Run Starter Tier refused the deploy (see Deployment) |
+| M4 experiment | runner, judge, summarize | all three strategies run on 30 questions, but histories were too short to separate them; see `RESULTS.md` |
 | M5 dashboard | Grafana provisioning + dashboard | dashboard queries return data from `data/metrics.sqlite` |
 
 The model is `gemini-3.5-flash-lite`. `gemini-2.5-flash`, named in the original spec, is deprecated and its free tier allows only 20 requests per day. The free tier for `gemini-3.5-flash-lite` allows 500 generate requests per day, which is about 80 eval questions. `eval/run_all.sh` runs all three strategies and resumes after quota stops.
@@ -119,13 +119,14 @@ OTEL_TRACES_EXPORTER=otlp python -m app.api
 
 The Grafana dashboard "TraceWise: cost and tokens/sec" reads `data/metrics.sqlite`.
 
-## Deploy to Cloud Run (M3)
+## Deployment (M3)
 
-`deploy/cloudrun_deploy.sh` targets a Starter Tier project (no billing account). It stages only the files the image needs, so `.env` is never uploaded. The Chroma index is baked into the image, so run `python -m app.ingest` first.
+**The service runs in local Docker. It is not deployed to Cloud Run.** The no-cost Starter Tier (project region `asia-south1`) was tried on 2026-11-21 and 2026-11-22, and refused both ways:
 
-```bash
-GCP_PROJECT=<project> GCP_REGION=<region> deploy/cloudrun_deploy.sh
-```
+- prebuilt image: `Deploying container images is not supported for this project.`
+- source upload without a build (`gcloud beta run deploy --no-build`): `Deployments using end-user credentials are not allowed for this account.`
+
+Cloud Build and Artifact Registry are not enabled there either. Starter Tier accepts apps published from AI Studio. `deploy/cloudrun_deploy.sh` is kept for a standard project, which needs billing and is out of scope.
 
 Image only: `docker build -f deploy/Dockerfile -t tracewise .`
 

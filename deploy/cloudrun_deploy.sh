@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Deploy TraceWise to Cloud Run (intended for a Starter Tier project: no billing account).
+# Deploy TraceWise to Cloud Run. NOT usable on a Starter Tier project: see the
+# README (tried 2026-11-21/22, refused). Needs a standard project with billing.
 #
 #   GCP_PROJECT=my-project GCP_REGION=<region> deploy/cloudrun_deploy.sh
 #
-# Starter Tier projects cannot enable Cloud Build or Artifact Registry, so a
-# source deploy may be refused there. Deploy a prebuilt public image instead:
+# To deploy a prebuilt public image instead of building from source:
 #
 #   IMAGE=docker.io/<user>/tracewise:<tag> GCP_PROJECT=... GCP_REGION=... deploy/cloudrun_deploy.sh
 #
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 : "${GCP_PROJECT:?set GCP_PROJECT}"
-: "${GCP_REGION:?set GCP_REGION (the Starter Tier region)}"
+: "${GCP_REGION:?set GCP_REGION}"
 SERVICE="${SERVICE:-tracewise}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 

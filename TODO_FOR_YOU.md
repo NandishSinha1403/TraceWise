@@ -4,7 +4,11 @@ Done by Claude:
 - Steps 1–6 and 8: documents, free-tier limits, verified prices, eval set, all three runs, `RESULTS.md`, the local Jaeger + Grafana stack (checked), and pushes to GitHub.
 - Free-tier limits found: `gemini-2.5-flash` allows 20 requests per day and is deprecated, so the project switched to `gemini-3.5-flash-lite`, which allows 500 requests per day.
 
-**Left for you: step 7, Cloud Run deploy (see the chat for steps).** A Starter Tier project is created only by publishing an app from AI Studio Build mode (https://aistudio.google.com/apps). Then run `gcloud auth login`, run `docker login`, and send Claude the project ID and your Docker Hub username.
+Step 7 (Cloud Run): tried and refused by the Starter Tier. M3 falls back to local Docker; the exact errors are in the README.
+
+**Left for you:**
+- Read `eval/questions.jsonl`. The spec asks for a review by hand; so far only Claude has reviewed it. Changing it means re-running all three strategies.
+- Decide whether to redo the experiment with harder or multi-turn questions (see `RESULTS.md`).
 
 The original task list follows, for reference.
 

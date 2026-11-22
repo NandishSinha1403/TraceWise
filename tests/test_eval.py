@@ -108,16 +108,19 @@ def test_summary_numbers_come_from_csv(tmp_path):
     run.mkdir()
     (run / "run_meta.json").write_text(json.dumps({"strategy_label": "full_history", "llm_backend": "gemini_api"}))
     fields = ["question_id", "ok", "strategy", "total_latency_ms", "backoff_ms", "total_cost_usd", "cost_complete",
-              "n_llm_calls", "input_tokens", "judge_correctness", "judge_groundedness"]
+              "n_llm_calls", "input_tokens", "judge_correctness", "judge_groundedness", "critic_retries", "n_tool_calls"]
+    (run / "calls.csv").write_text(
+        "node,call_type,decode_tps\nplanner,llm,10\nsummarizer,llm,20\nretriever,tool,\n"
+    )
     with (run / "requests.csv").open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         w.writerow(dict(question_id="1", ok="True", strategy="full_history", total_latency_ms="1000", backoff_ms="0",
                         total_cost_usd="0.01", cost_complete="True", n_llm_calls="5", input_tokens="100",
-                        judge_correctness="4", judge_groundedness="5"))
+                        judge_correctness="4", judge_groundedness="5", critic_retries="0", n_tool_calls="1"))
         w.writerow(dict(question_id="2", ok="True", strategy="full_history", total_latency_ms="3000", backoff_ms="1000",
                         total_cost_usd="0.03", cost_complete="True", n_llm_calls="7", input_tokens="300",
-                        judge_correctness="2", judge_groundedness="3"))
+                        judge_correctness="2", judge_groundedness="3", critic_retries="1", n_tool_calls="2"))
         w.writerow(dict(question_id="3", ok="False", strategy="full_history"))
     s = summarize.summarize_run(run)
     assert (s["n_ok"], s["n_err"]) == (2, 1)
@@ -125,6 +128,7 @@ def test_summary_numbers_come_from_csv(tmp_path):
     assert s["lat_excl_mean_ms"] == 1500
     assert s["cost_mean_usd"] == pytest.approx(0.02)
     assert (s["correctness_mean"], s["groundedness_mean"], s["n_judged"]) == (3, 4, 2)
+    assert (s["critic_retries_mean"], s["tool_calls_mean"], s["n_summarizer_calls"]) == (0.5, 1.5, 1)
 
 
 @pytest.mark.parametrize(
